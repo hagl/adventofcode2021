@@ -1,0 +1,7 @@
+utils.getFileAsText : Text ->{IO, Exception} Text
+utils.getFileAsText fileName =   
+  path = FilePath.FilePath fileName
+  bracket
+    '(openFile (path) Read)
+    closeFile
+    (fileHandle -> Text.fromUtf8 (getBytes fileHandle (base.io.getFileSize path)))

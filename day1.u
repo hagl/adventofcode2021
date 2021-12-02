@@ -5,17 +5,11 @@ day1 _ =
     use List drop filter filterMap zipWith
     incOrDec = zipWith (Nat.<) input (drop 1 input)
     List.size (filter id incOrDec)
-
-  path = FilePath.FilePath "day1.input"
-  inputText = 
-    bracket
-      '(openFile (path) Read)
-      closeFile
-      (fileHandle -> Text.fromUtf8 (getBytes fileHandle (base.io.getFileSize path)))
+  
+  inputText = utils.getFileAsText "day1.input"
 
   use Nat fromText toText
   numbers = filterMap fromText (Text.split ?\n inputText)
-
   printLine ("Part 1: " ++ toText (countAscending numbers))
   grouped = zipWith (+) (zipWith (+) numbers (drop 1 numbers)) (drop 2 numbers)
   printLine ("Part 2: " ++ toText (countAscending grouped))

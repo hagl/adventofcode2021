@@ -1,0 +1,52 @@
+use .external.stew.parser.Parser const oneOf ascii
+
+unique type Command = Forward Nat 
+  | Down Nat
+  | Up Nat
+
+nat : Parser e Char Nat
+nat = 
+  convert s = match Nat.fromText s with
+    Some n -> const n
+    None -> Parser.fail (TrivialError Location.unknown (Some (Label s)) (Set.singleton (Label "natural")))
+  Parser.flatMap convert (many ascii.digit $> fromCharList)
+
+command : Parser e Char Command
+command = oneOf [
+    string "forward " *> nat $> Forward,
+    string "down " *> nat $> Down,
+    string "up " *> nat $> Up
+  ]
+parser = sepBy command (char ?\n)
+
+part1: [Command] -> Int
+part1 commands =
+  step : (Int, Int) ->{} Command ->{} (Int, Int)
+  step = cases (x, y) -> cases 
+    Forward d -> (x + (toInt d), y)
+    Up d -> (x, y - (toInt d))
+    Down d -> (x, y + (toInt d))
+  location = List.foldLeft step (+0, +0) commands
+  match location with (x, y) -> x * y
+
+part2: [Command] -> Int
+part2 commands =
+
+  step : (Int, Int, Int) ->{} Command ->{} (Int, Int, Int)
+  step = cases (x, y, aim) -> cases 
+    Forward d -> (x + (toInt d), y + (aim * (toInt d)), aim) 
+    Up d -> (x, y, aim - (toInt d))
+    Down d -> (x, y, aim + (toInt d))
+  location = List.foldLeft step (+0, +0, +0) commands
+  match location with (x, y, _ ) -> x * y
+
+day2 : '{IO, Exception} ()
+day2 _ = 
+  inputText = utils.getFileAsText "day2.input"
+
+  result =  Parser.run parser (Tokens.fromText inputText)
+
+  match result with 
+    Right commands -> 
+      printLine ("Part 1: " ++ Int.toText (part1(commands)))
+      printLine ("Part 2: " ++ Int.toText (part2(commands)))
