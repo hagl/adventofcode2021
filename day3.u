@@ -1,0 +1,47 @@
+countZerosAndOnesAt : [[Char]] -> Nat -> (Nat, Nat)
+countZerosAndOnesAt list n = List.foldLeft (cases (zeros, ones) -> l ->match at n l with
+  Some ?0 -> (zeros + 1, ones)
+  Some ?1 -> (zeros, ones + 1)) (0, 0) list
+
+commonBits : Boolean -> [[Char]] -> [Char]
+commonBits mostCommon = cases
+  list@((h +: _) :+ _) ->
+    List.mapIndexed (pos -> _ -> match countZerosAndOnesAt list pos with
+      (zeros, ones) | zeros < ones -> if (mostCommon) then ?1 else ?0
+      (zeros, ones) | zeros > ones->  if (mostCommon) then ?0 else ?1
+    ) h
+
+filterList : Boolean -> Nat -> [[Char]] -> [[Char]]
+filterList mostCommon pos list =
+  pred : [Char] -> Boolean
+  pred = match countZerosAndOnesAt list pos with
+    (zeros, ones) | zeros <= ones -> (l -> List.at pos l === (if (mostCommon) then Some ?1 else Some ?0))
+    (zeros, ones) | zeros > ones-> (l -> List.at pos l === (if (mostCommon) then Some ?0 else Some ?1))
+  List.filter pred list
+
+findMatch : Boolean -> [[Char]] -> [Char]
+findMatch mostCommon list =
+  go : Boolean -> Nat -> [[Char]] -> [Char]
+  go mostCommon pos = cases
+    [last] -> last
+    l -> go mostCommon (Nat.increment pos) (filterList mostCommon pos l)
+  go mostCommon 0 list
+
+bitsToNumber : [Char] -> Optional Natural
+bitsToNumber chars =  Natural.parse (Text.fromCharList chars) 2
+
+day3 : '{IO, Exception} ()
+day3 _ =
+  inputText = utils.getFileAsText "day3.input"
+
+  numbers = List.map Text.toCharList (List.filter (t -> (Text.size t > 0)) (Text.split ?\n inputText))
+
+  gamma = bitsToNumber (commonBits true numbers)
+  epsilon = bitsToNumber (commonBits false numbers)
+  match (gamma, epsilon) with
+    (Some g, Some e) -> printLine ("Part 1: " ++ ( Natural.toDecimalText (g * e)))
+
+  oxygen = bitsToNumber (findMatch true numbers)
+  co2 = bitsToNumber (findMatch false numbers)
+  match (oxygen, co2) with
+    (Some o, Some c) -> printLine ("Part 2: " ++ ( Natural.toDecimalText (o * c)))
