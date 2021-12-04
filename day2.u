@@ -1,15 +1,9 @@
 use .external.stew.parser.Parser const oneOf ascii
+use .aoc2021.utils.parser
 
 unique type Command = Forward Nat 
   | Down Nat
   | Up Nat
-
-nat : Parser e Char Nat
-nat = 
-  convert s = match Nat.fromText s with
-    Some n -> const n
-    None -> Parser.fail (TrivialError Location.unknown (Some (Label s)) (Set.singleton (Label "natural")))
-  Parser.flatMap convert (many ascii.digit $> fromCharList)
 
 command : Parser e Char Command
 command = oneOf [

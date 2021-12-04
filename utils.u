@@ -25,4 +25,22 @@ test> utils.elementFrequency.tests.ex2 = check (elementFrequency [0,1,1,1,1] ===
 > elementFrequency [0,1,1,1,1]
 > List.groupBy id (Text.toCharList "abababab")
 
+utils.parser.sepBy1 : Parser e t b -> Parser e t a -> Parser e t (List.Nonempty b)
+utils.parser.sepBy1 pa ps =
+  go a = 
+    Parser.map (as -> Nonempty a as) (some (ps *> pa))
+  Parser.flatMap go pa
+
+utils.parser.whsp : Parser e Char ()
+utils.parser.whsp = many (eq ?\s) $> '()
+
+utils.parser.emptyLine : Parser e Char ()
+utils.parser.emptyLine = (eq ?\n) $> '()
+
+utils.parser.nat : Parser e Char Nat
+utils.parser.nat = 
+  convert s = match Nat.fromText s with
+    Some n -> Parser.const n
+    None -> Parser.fail (TrivialError Location.unknown (Some (Label s)) (Set.singleton (Label "natural")))
+  Parser.flatMap convert (many ascii.digit $> fromCharList)
 

@@ -1,0 +1,59 @@
+use .external.stew.parser.Parser const oneOf ascii
+use aoc2021.utils
+use aoc2021.utils.parser
+
+numbers : Parser e Char [Nat]
+numbers = sepBy nat (eq ?,) 
+
+board : Parser e Char [[Nat]]
+board = many ((optional whsp) *> (sepBy1 nat (many (eq ?\s)) $> Nonempty.toList) <* (eq ?\n))
+
+game : Parser e Char ([Nat], [[[Nat]]])
+game = numbers ^ (emptyLine *> emptyLine *> (sepBy board emptyLine))
+
+play : Nat -> [[Nat]] -> [[Nat]]
+play n = List.map (List.filter (m -> m != n)) 
+
+wins : [[Nat]] -> Boolean
+wins board = List.contains [] board
+
+score : Nat -> [[Nat]] -> Nat
+score move extendedBoard = 
+  -- divide by 2 since each number is duplicated by extension
+  (move * List.foldLeft (Nat.+) 0 (List.flatMap id extendedBoard)) / 2
+
+part1: ([Nat], [[[Nat]]]) ->{} Nat
+part1 = cases (draws, boards) ->
+  -- an extended board has the columns added as additional rows, 
+  -- so we just need to care about rows
+  extBoards = List.map (board -> board List.++ (transpose board)) boards 
+  go : [[[Nat]]] ->{} [Nat] ->{} Nat
+  go boards = cases 
+    (h +: t) -> 
+      newBoards = List.map (play h) boards
+      match List.find wins newBoards with
+        None -> go newBoards t
+        Some board -> score h board
+  go extBoards draws
+
+part2: ([Nat], [[[Nat]]]) ->{} Nat
+part2 = cases (draws, boards) ->
+  extBoards = List.map (board -> board List.++ (transpose board)) boards 
+  go : [[[Nat]]] ->{} [Nat] ->{} Nat
+  go boards = cases 
+    (h +: t) -> 
+      newBoards = List.map (play h) boards
+      match List.all wins newBoards with
+        false -> go newBoards t
+        true -> match List.find (not. wins. Tuple.at1) (List.zip boards newBoards) with
+          Some (_, board) ->  score h board
+  go extBoards draws
+
+day4 : '{IO, Exception} ()
+day4 _ = 
+  inputText = utils.getFileAsText "day4.input"
+  
+  match Parser.run game (Tokens.fromText inputText) with 
+    Right g -> 
+      printLine ("Part 1: " ++ Nat.toText (part1(g)))
+      printLine ("Part 2: " ++ Nat.toText (part2(g)))
