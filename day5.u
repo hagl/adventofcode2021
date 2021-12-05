@@ -1,0 +1,60 @@
+use .external.stew.parser.Parser const oneOf ascii
+use aoc2021.utils
+use aoc2021.utils.parser
+
+unique type Line = Line (Nat, Nat) (Nat, Nat)
+
+comma : Parser e Char ()
+comma = (eq ?,) $> '()
+
+point: Parser e Char (Nat, Nat) 
+point = nat ^ (comma *> nat)
+
+line : Parser e Char Line
+line = point ^ (string " -> " *> point) $> cases (start, end) -> Line start end
+
+parser = sepBy line newLine
+
+hOrV : Line -> Boolean 
+hOrV = cases (Line (x0, y0) (x1, y1)) -> (x0 == x1) || (y0 == y1)
+
+rangeIncl: Nat -> Nat -> [Nat]
+rangeIncl a b = 
+  if (a < b) 
+    then List.range a (b + 1)
+    else List.reverse (List.range b (a + 1))
+
+points : Line -> [(Nat, Nat)]
+points = cases (Line (x0, y0) (x1, y1)) -> 
+  if (x0 == x1) then List.map (y -> (x0, y)) (rangeIncl y0 y1)
+  else if (y0 == y1) then List.map (x -> (x, y0)) (rangeIncl x0 x1)
+  else List.zip (rangeIncl x0 x1) (rangeIncl y0 y1)
+
+countMultiPoints : [Line] -> Nat
+countMultiPoints list = 
+  list |>
+  List.flatMap points |>
+  List.groupBy id |>
+  Map.values |>
+  List.map Nonempty.size |>
+  List.filter (x -> x > 1) |> 
+  List.size
+
+part1: [Line] ->{} Nat
+part1 lines = 
+  filtered = List.filter hOrV lines
+  countMultiPoints filtered
+
+part2: [Line] ->{} Nat
+part2 lines =   countMultiPoints lines
+
+day5 : '{IO, Exception} ()
+day5 _ = 
+  inputText = utils.getFileAsText "day5.input"
+  
+  match Parser.run parser (Tokens.fromText inputText) with 
+    Right parsed -> 
+      printLine ("Part 1: " ++ Nat.toText (part1(parsed)))
+      printLine ("Part 2: " ++ Nat.toText (part2(parsed)))
+
+

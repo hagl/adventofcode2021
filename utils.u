@@ -34,8 +34,8 @@ utils.parser.sepBy1 pa ps =
 utils.parser.whsp : Parser e Char ()
 utils.parser.whsp = many (eq ?\s) $> '()
 
-utils.parser.emptyLine : Parser e Char ()
-utils.parser.emptyLine = (eq ?\n) $> '()
+utils.parser.newLine : Parser e Char ()
+utils.parser.newLine = (eq ?\n) $> '()
 
 utils.parser.nat : Parser e Char Nat
 utils.parser.nat = 

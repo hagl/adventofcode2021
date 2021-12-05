@@ -9,7 +9,7 @@ board : Parser e Char [[Nat]]
 board = many ((optional whsp) *> (sepBy1 nat (many (eq ?\s)) $> Nonempty.toList) <* (eq ?\n))
 
 game : Parser e Char ([Nat], [[[Nat]]])
-game = numbers ^ (emptyLine *> emptyLine *> (sepBy board emptyLine))
+game = numbers ^ (newLine *> newLine *> (sepBy board newLine))
 
 play : Nat -> [[Nat]] -> [[Nat]]
 play n = List.map (List.filter (m -> m != n)) 
@@ -52,7 +52,7 @@ part2 = cases (draws, boards) ->
 day4 : '{IO, Exception} ()
 day4 _ = 
   inputText = utils.getFileAsText "day4.input"
-  
+
   match Parser.run game (Tokens.fromText inputText) with 
     Right g -> 
       printLine ("Part 1: " ++ Nat.toText (part1(g)))
