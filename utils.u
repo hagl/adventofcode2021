@@ -21,10 +21,6 @@ utils.elementFrequency list = List.reverse (List.sortBy Tuple.at2 (Map.toList (M
 test> utils.elementFrequency.tests.ex1 = check (elementFrequency [1,1,1,1,1] === [(1,5)])
 test> utils.elementFrequency.tests.ex2 = check (elementFrequency [0,1,1,1,1] === [(1,4), (0, 1)])
 
-> elementFrequency [1,1,1,1,1]
-> elementFrequency [0,1,1,1,1]
-> List.groupBy id (Text.toCharList "abababab")
-
 utils.parser.sepBy1 : Parser e t b -> Parser e t a -> Parser e t (List.Nonempty b)
 utils.parser.sepBy1 pa ps =
   go a = 

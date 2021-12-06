@@ -1,0 +1,25 @@
+use Nat fromText toText
+
+step : [Nat] -> [Nat]
+step = cases
+  [n0, n1, n2, n3, n4, n5, n6, n7, n8] -> [n1, n2, n3, n4, n5, n6, n7 + n0, n8, n0]
+
+propagate : Nat -> [Nat] -> Nat
+propagate count fishes = 
+  grouped = Map.map Nonempty.size (List.groupBy id fishes)
+  initial = List.map (k -> Map.getOrElse 0 k grouped) (List.range 0 9)
+  List.foldLeft (Nat.+) 0 (List.foldLeft (f _ -> step f) initial (List.range 0 count))
+
+part1 : [Nat] -> Nat
+part1 = propagate 80
+
+part2 : [Nat] -> Nat
+part2 = propagate 256
+
+day6 : '{IO, Exception} ()
+day6 _ = 
+  inputText = utils.getFileAsText "day6.input"
+  fishes = filterMap fromText (Text.split ?, inputText)
+  
+  printLine ("Part 1: " ++ Nat.toText (part1(fishes)))
+  printLine ("Part 2: " ++ Nat.toText (part2(fishes)))
