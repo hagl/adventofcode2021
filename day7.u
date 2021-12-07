@@ -1,0 +1,28 @@
+use Nat fromText toText
+use utils
+
+solution: (Nat -> Nat -> Nat) -> [Nat] -> Nat
+solution cost list =
+  a = Optional.getOrElse 0 (List.minimum list)
+  b = Optional.getOrElse 0 (List.maximum list)
+  m = List.minimum (List.map (p -> sum ((List.map (x -> cost p x) list))) (List.range a b))
+  Optional.getOrElse 0 m
+
+part1 : [Nat] -> Nat
+part1 = solution dist
+
+part2 : [Nat] -> Nat
+part2 =
+  cost: Nat -> Nat -> Nat
+  cost a b =
+    d = dist a b
+    d * (d + 1) / 2
+  solution cost
+
+day7 : '{IO, Exception} ()
+day7 _ =
+  inputText = utils.getFileAsText "day7.input"
+  input = filterMap fromText (Text.split ?, inputText)
+
+  printLine ("Part 1: " ++ Nat.toText (part1(input)))
+  printLine ("Part 2: " ++ Nat.toText (part2(input)))

@@ -6,6 +6,13 @@ utils.getFileAsText fileName =
     closeFile
     (fileHandle -> Text.fromUtf8 (getBytes fileHandle (base.io.getFileSize path)))
 
+utils.sum : [Nat] -> Nat
+utils.sum = List.foldLeft (Nat.+) 0
+
+utils.dist: Nat -> Nat -> Nat
+utils.dist a b =
+  d = a - b
+  Int.truncate0 (if (d Int.< +0) then Int.negate d else d)
 
 utils.transpose: [[a]] -> [[a]]
 utils.transpose = cases

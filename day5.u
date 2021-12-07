@@ -56,5 +56,3 @@ day5 _ =
     Right parsed -> 
       printLine ("Part 1: " ++ Nat.toText (part1(parsed)))
       printLine ("Part 2: " ++ Nat.toText (part2(parsed)))
-
-
