@@ -1,0 +1,58 @@
+use .external.stew.parser.Parser const oneOf ascii sepBy
+use aoc2021.utils
+use aoc2021.utils.parser
+
+textParser = many (Parser.token (c -> if List.contains c [?a, ?b, ?c, ?d, ?e, ?f, ?g] then Some c else None )) $> fromCharList
+
+line : Parser e Char ([Text], [Text])
+line = (sepBy textParser (eq ?\s)) ^ ((string " | ") *>  (sepBy textParser (eq ?\s)))
+
+parser = sepBy line newLine
+
+part1: [([Text], [Text])] ->{} Nat
+part1 lines =
+  uniqueSize  c =
+    l = Text.size c
+    (l == 2) || (l == 3) || (l == 4) || (l == 7)
+  lines
+    |> List.flatMap Tuple.at2
+    |> List.filter uniqueSize
+    |> List.size
+
+decode : ([Text], [Text]) ->{} Nat
+decode input =
+  normalize = sort . toCharList
+  digits = List.map normalize (Tuple.at1 input)
+  output = List.map normalize (Tuple.at2 input)
+  d1 = match List.find (t -> List.size t == 2) digits with Some x -> x
+  d7 = match List.find (t -> List.size t == 3) digits with Some x -> x
+  d4 = match List.find (t -> List.size t == 4) digits with Some x -> x
+  d8 = match List.find (t -> List.size t == 7) digits with Some x -> x
+
+  c960 = List.filter (t -> List.size t == 6) digits
+  d6 = match List.find (t -> not (List.all (a -> List.contains a t) d1)) c960 with Some x -> x
+  d9 = match List.find (t -> List.all (a -> List.contains a t) d4) c960 with Some x -> x
+  d0 = match List.find (t ->  not ((t === d6) || (t === d9)) ) c960 with Some x -> x
+
+  c235 = List.filter (t -> List.size t == 5) digits
+  d3 = match List.find (t -> List.all (a -> List.contains a t) d1) c235 with Some x -> x
+  d5 = match List.find (t -> List.all (a -> List.contains a d6) t) c235 with Some x -> x
+  d2 = match List.find (t ->  not ((t === d3) || (t === d5)) ) c235 with Some x -> x
+
+  mapping = Map.fromList (List.indexed [d0, d1, d2, d3, d4, d5, d6, d7, d8, d9])
+
+  match List.map (d -> Map.get d mapping) output with
+    [Some a, Some b, Some c, Some d] -> (a * 1000) + (b * 100) + (c * 10) + d
+
+part2: [([Text], [Text])] ->{} Nat
+part2 input =
+  utils.sum (List.map decode input)
+
+day8 : '{IO, Exception} ()
+day8 _ =
+  inputText = utils.getFileAsText "day8.input"
+
+  match Parser.run parser (Tokens.fromText inputText) with
+    Right parsed ->
+      printLine ("Part 1: " ++ Nat.toText (part1(parsed)))
+      printLine ("Part 2: " ++ Nat.toText (part2(parsed)))

@@ -1,0 +1,79 @@
+use Nat fromText toText
+use utils
+
+left : [[Nat]] -> (Nat, Nat) -> Optional (Nat, Nat)
+left grid = cases (x, y) -> if (x == 0) then None else Some (Nat.drop x 1, y)
+
+right : [[Nat]] -> (Nat, Nat) -> Optional (Nat, Nat)
+right grid = cases (x, y) -> Some (x + 1, y)
+
+up : [[Nat]] -> (Nat, Nat) -> Optional (Nat, Nat)
+up grid = cases (x, y) -> if (y == 0) then None else Some (x, Nat.drop y 1)
+
+down : [[Nat]] -> (Nat, Nat) -> Optional (Nat, Nat)
+down grid = cases (x, y) -> Some (x, y + 1)
+
+isLower : Optional Nat -> Optional Nat -> Boolean
+isLower = cases
+  None -> 'false
+  Some n -> cases
+    None -> true
+    Some m -> n < m
+
+pointAt:  [[Nat]] -> (Nat, Nat) -> Optional Nat
+pointAt grid =  cases (x, y) -> Optional.flatMap (row -> List.at x row) (List.at y grid)
+
+riskLevel : [[Nat]] -> (Nat, Nat) -> Optional Nat
+riskLevel grid = cases c ->
+  point = pointAt grid c
+  if List.all (x -> isLower point (Optional.flatMap (pointAt grid) x)) [
+    left grid c,
+    right grid c,
+    up grid c,
+    down grid c,
+  ] then (Optional.map Nat.increment point) else None
+
+isBasinPoint : [[Nat]] -> (Nat, Nat) -> Boolean
+isBasinPoint grid c = match pointAt grid c with
+  None -> false
+  Some 9 -> false
+  _ -> true
+
+extendBasin : [[Nat]] -> Set (Nat, Nat) -> [(Nat, Nat)] -> Set (Nat, Nat)
+extendBasin grid acc = cases
+  [] -> acc
+  (h +: t) ->
+    if (not (Set.contains h acc) && (isBasinPoint grid h))
+      then extendBasin grid (Set.insert h acc) ((List.filterMap id [left grid h, right grid h, up grid h, down grid h]) ++ t)
+      else extendBasin grid acc t
+
+basinSize : [[Nat]] -> (Nat, Nat) -> Nat
+basinSize grid c =
+  basin = extendBasin grid Set.empty [c]
+  Set.size basin
+
+part1 : [[Nat]] -> Nat
+part1 = cases
+  grid@(row1 +: _) ->
+    h = List.size grid
+    w = List.size row1
+    positions = List.flatMap (y -> List.map (x -> (x, y)) (List.range 0 w)) (List.range 0 h)
+    utils.sum (List.filterMap (riskLevel grid) positions)
+
+part2 : [[Nat]] -> Nat
+part2 = cases
+  grid@(row1 +: _) ->
+    h = List.size grid
+    w = List.size row1
+    positions = List.flatMap (y -> List.map (x -> (x, y)) (List.range 0 w)) (List.range 0 h)
+    lows = List.filter (Optional.isSome . (riskLevel grid)) positions
+    basins = List.map (basinSize grid) lows
+    List.foldLeft (Nat.*) 1 (List.take 3 (List.sortBy (x -> 0 - x) basins))
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day9.input"
+  input = List.filter (not . isNone . head) (List.map (t -> List.filterMap (fromText . Char.toText) (Text.toCharList t)) (Text.split ?\n inputText))
+
+  printLine ("Part 1: " ++ Nat.toText (part1(input)))
+  printLine ("Part 2: " ++ Nat.toText (part2(input)))
