@@ -1,0 +1,54 @@
+use Nat fromText toText
+use utils
+
+closingChar : Char -> Optional Char
+closingChar = cases
+  ?( -> Some ?)
+  ?[ -> Some ?]
+  ?{ -> Some ?}
+  ?< -> Some ?>
+  _ -> None
+
+score : Char -> Nat
+score = cases
+  ?) -> 3
+  ?] -> 57
+  ?} -> 1197
+  ?> -> 25137
+
+completionScore : [Char] -> Nat
+completionScore = 
+  cScore = cases
+    ?) -> 1
+    ?] -> 2
+    ?} -> 3
+    ?> -> 4
+  List.foldLeft (s -> c -> 5 * s + (cScore c)) 0 
+
+findFirstCorruptOrCompletion : Text -> Either Char [Char]
+findFirstCorruptOrCompletion = 
+  go : [Char] -> [Char] -> Either Char [Char]
+  go stack = cases
+    [] -> Right stack
+    (h +: t) -> match closingChar h with
+      Some cc -> go (cc +: stack) t 
+      None -> match stack with
+        (c +: cs) | h == c -> go cs t
+        _ -> Left h
+  (go []) . toCharList
+
+part1 : [Text] -> Nat
+part1 t  = List.filterMap (left . findFirstCorruptOrCompletion)  t  |> List.map score |> sum
+
+part2 : [Text] -> Nat
+part2 t  = 
+  scores = List.filterMap (right . findFirstCorruptOrCompletion)  t  |> List.map completionScore |> sort
+  Optional.getOrElse 0 (List.at (List.size scores / 2) scores)
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day10.input"
+  input = List.filter (t -> Text.size t > 0) (Text.split ?\n inputText)
+
+  printLine ("Part 1: " ++ Nat.toText (part1(input)))
+  printLine ("Part 2: " ++ Nat.toText (part2(input)))
