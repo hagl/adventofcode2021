@@ -1,0 +1,62 @@
+use Nat fromText toText
+use List :+ +: foldLeft
+use base.Stream emit
+
+unique type Position = Pos Nat Nat
+unique type Grid = Grid [[Nat]]
+unique type Flash = Flash
+
+update : Position -> Grid ->{Stream Position} Grid
+update = cases (Pos x y) -> cases (Grid grid) -> Grid (List.updateAt (list  -> List.updateAt (n -> if n == 9 then emit (Pos x y); n + 1 else n + 1)  x list) y grid)
+
+neighbours : Position -> [Position]
+neighbours = cases p@(Pos x y) ->
+  List.filter (pos -> not (pos === p)) (rectangle (Nat.decrement x) (x + 2) (Nat.decrement y) (y + 2))
+
+flash : Position -> Grid -> Grid
+flash p grid = List.foldRight update grid (neighbours p)
+
+flashList : Grid -> [Position] -> Grid
+flashList grid list = List.foldRight flash grid list
+
+rectangle : Nat -> Nat -> Nat -> Nat -> [Position]
+rectangle x0 x1 y0 y1 = List.flatMap (x -> (List.map (y -> Pos x y) (List.range y0 y1))) (List.range x0 x1)
+
+increment : Grid -> Grid
+increment = cases grid@(Grid listOfLists) ->
+  h = List.size listOfLists 
+  w = Optional.getOrElse 0 (Optional.map List.size (List.head listOfLists))
+  List.foldRight update grid (rectangle 0 w 0 h)
+
+trim : Grid ->{Stream Flash} Grid
+trim = cases (Grid listOfLists) ->
+  reset n = if n > 9 then emit Flash; 0 else n
+  Grid (List.map (List.map reset) listOfLists)
+
+step : Grid -> Grid
+step grid = 
+  loop : ([Position], Grid) -> Grid
+  loop = cases
+    ([], grid) -> grid
+    (list, grid) -> loop (Stream.toListWithResult! '(flashList grid list))
+  newGrid = loop (Stream.toListWithResult! '(increment grid))
+  trim newGrid
+
+part1 : Grid -> Nat
+part1 grid  = List.size (Stream.toList! '(List.foldRight 'step grid (List.range 0 100)))
+  
+part2 : Grid -> Nat
+part2 grid  = 
+  loop grid c = match grid with (Grid listOfLists) -> 
+    if maximum (List.filterMap maximum listOfLists) === Some 0 then c else loop (step grid) (c + 1)
+  Tuple.at2 (Stream.toListWithResult! '(loop grid 0))
+
+convert : Text -> Grid
+convert inputText = Grid (List.map ((List.map ((Optional.getOrElse 0) . Nat.fromText . Char.toText)) . toCharList) (List.filter (t -> Text.size t > 0) (Text.split ?\n inputText)))
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day11.input"
+  input = convert inputText
+  printLine ("Part 1: " ++ Nat.toText (part1(input)))
+  printLine ("Part 2: " ++ Nat.toText (part2(input)))
