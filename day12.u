@@ -1,0 +1,50 @@
+use Nat fromText toText
+use utils
+
+cave = many ascii.letter $> fromCharList
+
+rule : Parser e Char (Text, Text)
+rule = cave ^ ((char ?-) *> cave)
+
+parser = sepBy rule newLine
+
+visitTwiceToken = "***"
+
+pathes : Boolean -> Map Text [Text] -> [Text]
+pathes twice m =
+  caves = keys m
+  smallCaves = Set.fromList (List.filter (t -> Optional.Some true === Optional.map (inRange ?a ?z) (List.head (Text.toCharList t))) caves)
+  go : Text -> Set Text -> Text ->  [Text]
+  go currPath unvisited pos = 
+    newPath = currPath ++ "," ++ pos
+    if pos == "end" then [newPath]
+    else List.flatMap (c -> 
+      if Set.contains c smallCaves 
+        then
+         if Set.contains c unvisited 
+           then go newPath (Set.delete c unvisited) c 
+           else
+            if (not (c == "start")) && (Set.contains visitTwiceToken unvisited)
+              then go newPath (Set.delete visitTwiceToken unvisited) c 
+              else []
+        else go newPath unvisited c) (Map.getOrElse [] pos m)
+  unvisited = Set.delete "start" smallCaves
+  go "" (if twice then Set.union unvisited (Set.singleton visitTwiceToken) else unvisited) "start"
+
+part1 :  Map Text [Text] -> Nat
+part1 rules = List.size (pathes false rules)
+
+part2 :  Map Text [Text] -> Nat
+part2 rules = List.size (pathes true rules)
+
+main : '{IO, Exception} ()
+main _ = 
+  inputText = utils.getFileAsText "day12.input"
+
+  match Parser.run parser (Tokens.fromText inputText) with
+    Right rules ->
+      reversed = List.map (cases (a,b) -> (b, a)) rules
+      map = Map.map (nel -> List.map Tuple.at2 (Nonempty.toList nel)) (List.groupBy Tuple.at1 (rules ++ reversed))
+
+      printLine ("Part 1: " ++ Nat.toText (part1(map)))
+      printLine ("Part 2: " ++ Nat.toText (part2(map)))
