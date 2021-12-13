@@ -1,0 +1,50 @@
+use external.stew.parser 
+use Nat fromText toText
+use utils.parser nat
+
+pointParser : Parser e Char (Nat, Nat)
+pointParser = nat ^ ((char ?,) *> nat)
+
+foldParser : Parser e Char (Boolean, Nat)
+foldParser = (string "fold along " *> (or ((char ?x) $> 'true) ((char ?y) $> 'false))) ^ (char ?= *> nat)
+
+parser : Parser e Char ([(Nat, Nat)], [(Boolean, Nat)])
+parser = (sepBy pointParser newLine) ^ (newLine *> newLine *> (sepBy foldParser newLine))
+
+fold : [(Nat, Nat)] -> (Boolean, Nat) -> [(Nat, Nat)] 
+fold grid = cases (isX, f) ->  -- x -> 
+  foldC n = if n < f then n else Nat.drop (f + f) n 
+  List.map (cases (x,y) -> if isX then (foldC x, y) else (x, foldC y)) grid
+
+lineToString : Nat -> [Nat] -> Text
+lineToString width list = Text.fromCharList (List.map (x -> if (List.contains x list) then ?⬛ else ?⬜) (List.range 0 width))
+
+gridToText : [(Nat, Nat)] -> Nat -> [Text]
+gridToText result width =
+  lines = List.map (Nonempty.toList . Tuple.at2) (List.sortBy Tuple.at1 (Map.toList (List.groupBy Tuple.at2 result)))
+  List.map (l -> (lineToString width (List.map Tuple.at1 l))) lines
+
+part1 : ([(Nat, Nat)], [(Boolean, Nat)]) -> Nat
+part1 input = 
+  points = Tuple.at1 input
+  match head (Tuple.at2 input) with 
+    Optional.Some f -> 
+      result = fold points f
+      List.size (Map.toList (List.groupBy id result))
+
+part2 : ([(Nat, Nat)], [(Boolean, Nat)]) -> Nat
+part2 input = 
+  result = List.foldLeft fold (Tuple.at1 input) (Tuple.at2 input)
+  width = Optional.getOrElse 100 (List.minimum (List.map Tuple.at2 (List.filter Tuple.at1 (Tuple.at2 input))))
+  List.map printLine (gridToText result width)
+  0
+
+main : '{IO, Exception} ()
+main _ = 
+  inputText = utils.getFileAsText "day13.input"
+
+  match Parser.run parser (Tokens.fromText inputText) with
+    Right input ->
+      printLine ("Part 1: " ++ Nat.toText (part1(input)))
+      printLine ("Part 2: " ++ Nat.toText (part2(input)))
+
