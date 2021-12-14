@@ -1,0 +1,79 @@
+use external.stew.parser
+use Nat fromText toText
+use utils.parser nat
+
+templateParser : Parser e Char Text
+templateParser = many ascii.letter $> fromCharList
+
+ruleParser : Parser e Char ((Char, Char), Char)
+ruleParser = ascii.letter ^ ascii.letter ^ (string " -> " *> ascii.letter)
+
+parser : Parser e Char (Text, [((Char, Char), Char)])
+parser = (templateParser) ^ (newLine *> newLine *> (sepBy ruleParser newLine))
+
+step : Map (Char, Char) Char -> [Char] ->  [Char]
+step rules input =
+  List.zip input (List.drop 1 input) |>
+    List.flatMap (cases p@(c1, c2) -> [Map.getOrElse ?? p rules, c2]) |>
+    (l -> (Optional.getOrElse ?? (List.head input)) +: l)
+
+part1 :(Text, [((Char, Char), Char)]) -> Nat
+part1 input =
+  rules = Map.fromList (Tuple.at2 input)
+  start = Text.toCharList (Tuple.at1 input)
+  result = List.foldRight '(step rules) start (List.range 0 10)
+  List.groupBy id result |>
+    Map.toList |>
+    List.map (Nonempty.size . Tuple.at2) |>
+    List.sortBy id |>
+    List.nonempty |>
+    cases
+      Some nel -> Nat.drop (Nonempty.last nel) (Nonempty.head nel)
+
+part2 :(Text, [((Char, Char), Char)]) -> Nat
+part2 input =
+  template = Tuple.at1 input
+  rules = Map.fromList (Tuple.at2 input)
+  test2 template rules
+
+test2 template rules =
+  chars =
+    rules
+      |> Map.keys
+      |> List.map Tuple.at1
+      |> List.groupBy id
+      |> Map.keys
+      |> List.sortBy id
+  charMap =
+    chars
+      |> List.indexed
+      |> Map.fromList
+  startMap = Map.mapWithKey (cases (c, _) -> _ -> oneHot chars c) rules
+  resultMap = List.foldRight '(step2 rules) startMap (List.range 0 40)
+
+  templateList = Text.toCharList template
+  List.zip templateList (List.drop 1 templateList)
+    |> List.map (p -> Map.getOrElse [] p resultMap)
+    |> List.foldLeft (List.zipWith (+)) (oneHot chars (Optional.getOrElse ?_ (List.last templateList)))
+    |> (list -> match (minimum list, maximum list) with (Some a, Some b) -> Nat.drop b a)
+
+step2 : Map (Char, Char) Char -> Map (Char, Char) [Nat] -> Map (Char, Char) [Nat]
+step2 rules input =
+  use Map
+  combine : (Char, Char) -> [Nat]
+  combine = cases k@(a, b) -> match lookup k rules with
+    Some c -> match (lookup (a, c) input, lookup (c,b) input) with
+      (Some l1, Some l2) -> List.zipWith (+) l1 l2
+  Map.mapWithKey (k -> _ -> combine k) input
+
+oneHot : List a -> a -> List Nat
+oneHot list e = List.map ((b -> if b then 1 else 0) . ((===) e)) list
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day14.input"
+
+  match Parser.run parser (Tokens.fromText inputText) with
+    Right input ->
+      printLine ("Part 1: " ++ Nat.toText (part1(input)))
+      printLine ("Part 2: " ++ Nat.toText (part2(input)))
