@@ -47,3 +47,36 @@ utils.parser.nat =
     None -> Parser.fail (TrivialError Location.unknown (Some (Label s)) (Set.singleton (Label "natural")))
   Parser.flatMap convert (many ascii.digit $> fromCharList)
 
+unique type utils.Grid a = Grid [[a]]
+
+{{ Parse a string consisting of lines of digits into a grid of Nat}}
+utils.digitGrid : Text -> Grid Nat
+-- utils.digitGrid inputText = Grid (List.map ((List.map ((Optional.getOrElse 0) . Nat.fromText . Char.toText)) . toCharList) (List.filter (t -> Text.size t > 0) (Text.split ?\n inputText)))
+utils.digitGrid inputText =
+  Text.split ?\n inputText
+    |> List.filter (t -> Text.size t > 0)
+    |> List.map ((List.map ((Optional.getOrElse 0) . Nat.fromText . Char.toText)) . toCharList)
+    |> Grid
+
+test> utils.digitGrid.test.ex1 = check (utils.digitGrid "012\n345" === Grid [[0, 1, 2], [3, 4, 5]])
+--  Grid (List.map ((List.map ((Optional.getOrElse 0) . Nat.fromText . Char.toText)) . toCharList) ( ()))
+
+utils.gridDimensions : Grid a -> (Nat, Nat)
+utils.gridDimensions = cases
+  Grid [] -> (0,0)
+  Grid l@(h +: _) -> (List.size h, List.size l)
+
+test> utils.gridDimensions.test.ex1 = check (gridDimensions (Grid [[0, 1, 2], [3, 4, 5]]) === (3,2))
+
+unique type utils.Position = Pos Nat Nat
+
+utils.maxPosition : Grid a -> Position
+utils.maxPosition grid = match gridDimensions grid with (x,y) -> Pos (Nat.decrement x) (Nat.decrement y)
+
+utils.getValue : Position -> Grid a -> Optional a
+utils.getValue = cases (Pos x y) -> cases (Grid data) ->
+  Optional.flatMap (l -> List.at x l) (List.at y data)
+
+
+
+

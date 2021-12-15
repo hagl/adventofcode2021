@@ -1,0 +1,83 @@
+use Nat fromText toText
+use List :+ +: foldLeft
+use base.Stream emit
+use base.Optional
+use utils
+use utils.Grid
+use utils.Position
+
+neighbours : Position -> [Position]
+neighbours = cases
+  Pos 0 0 -> [Pos 0 1, Pos 1 0]
+  Pos x 0 -> [Pos (Nat.decrement x) 0, Pos (x + 1) 0, Pos x 1]
+  Pos 0 y -> [Pos 0 (Nat.decrement y), Pos 1 y, Pos 0 (y + 1)]
+  Pos x y -> [Pos x (Nat.decrement y), Pos (Nat.decrement x) y, Pos (x + 1) y, Pos x (y + 1)]
+
+setValue : Position -> Nat -> Grid (Optional Nat) -> Grid (Optional Nat)
+setValue =
+  setAndEmit : Position -> Nat -> Optional Nat -> Optional Nat
+  setAndEmit pos v = cases
+    Some n | n <= v -> Some n -- don't update
+    _ ->
+      emit pos
+      Some v
+  cases pos@(Pos x y) -> value  -> cases Grid grid -> Grid (List.updateAt (List.updateAt (setAndEmit pos value) x) y grid)
+
+moveOne : Grid Nat ->  Nat -> Grid (Optional Nat) -> Position ->  Grid (Optional Nat)
+moveOne levels currentLevel cl  = cases pos@(Pos x y) ->
+  match getValue pos levels with
+    Some level -> setValue pos (currentLevel + level) cl
+    None -> cl
+
+move : Grid Nat ->  Grid (Optional Nat) -> Position ->  Grid (Optional Nat)
+move levels cl = cases pos@(Pos x y) ->
+  match getValue pos cl with
+    Some (Some currentLevel) ->
+      List.foldLeft (moveOne levels currentLevel) cl (neighbours pos)
+    _ -> cl
+
+loop : Grid Nat ->  ([Position], Grid (Optional Nat)) -> Grid (Optional Nat)
+loop levels = cases
+  ([], grid) -> grid
+  (list, grid) -> loop levels (Stream.toListWithResult! '(List.foldLeft (move levels) grid list))
+
+
+part1 : Grid Nat -> Nat
+part1 = cases levels@(Grid data) ->
+  cl = Grid (List.map (List.map 'None) data)
+  newCl = loop levels (Stream.toListWithResult! '(setValue (Pos 0 0) 0 cl))
+  Optional.getOrElse 0 (Optional.getOrElse None (getValue (maxPosition newCl) newCl))
+
+plus1wrap : Nat -> Nat
+plus1wrap = cases
+  9 -> 1
+  n -> n + 1
+
+p1l : [Nat] -> [Nat]
+p1l = List.map plus1wrap
+
+p1g : [[Nat]] -> [[Nat]]
+p1g = List.map p1l
+
+ext5l : [Nat] -> [Nat]
+ext5l l =
+  Tuple.at1 (List.foldLeft (cases (acc, cur) -> _ -> (acc List.++ cur, p1l cur)) ([], l) (List.range 0 5))
+
+ext5g : [[Nat]] -> [[Nat]]
+ext5g l =
+  l5 = List.map ext5l l
+  Tuple.at1 (List.foldLeft (cases (acc, cur) -> _ -> (acc List.++ cur, p1g cur)) ([], l5) (List.range 0 5))
+
+part2 : Grid Nat -> Nat
+part2 = cases (Grid data0) ->
+  part1 (Grid (ext5g data0))
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day15.input"
+  input = utils.digitGrid inputText
+  printLine ("Part 1: " ++ Nat.toText (part1(input)))
+  startTime = !systemTimeMicroseconds
+  printLine ("Part 2: " ++ Nat.toText (part2(input)))
+  duration = !systemTimeMicroseconds - startTime
+  printLine ("Duration:" ++ (Int.toText duration) ++ "μs")
