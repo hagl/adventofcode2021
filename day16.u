@@ -1,0 +1,131 @@
+use Nat fromText toText
+use List :+ +: foldLeft
+use base.Stream emit
+use base.Optional
+use utils
+
+unique type Payload
+  = Literal Nat
+  | Operator Nat [Packet]
+
+unique type Packet = Packet Nat Payload
+
+parseLiteral : [Char] -> (Payload, [Char])
+parseLiteral list =
+  go acc = cases
+    (?1 +: rest) -> go (acc ++ (List.take 4 rest)) (List.drop 4 rest)
+    (?0 +: rest) -> (Literal (fromBits (acc ++ (List.take 4 rest))), (List.drop 4 rest))
+  go [] list
+
+parseOperator : Nat -> [Char] -> (Payload, [Char])
+parseOperator typeId = cases
+  (?1 +: rest) -> parsePacketsCount typeId (fromBits (List.take 11 rest)) (List.drop 11 rest)
+  (?0 +: rest) -> parsePacketsLength typeId (fromBits (List.take 15 rest)) (List.drop 15 rest)
+
+parsePacketsCount : Nat -> Nat -> [Char] -> (Payload, [Char])
+parsePacketsCount typeId count list =
+  match List.foldLeft (cases (acc, l) -> _ -> Tuple.mapLeft ((:+) acc) (parse l)) ([], list) (List.range 0 count) with
+    (packets, rest) -> (Operator typeId packets, rest)
+
+parsePacketsLength : Nat -> Nat -> [Char] -> (Payload, [Char])
+parsePacketsLength typeId length list =
+  targetListSize = Nat.drop (List.size list) length
+  go : [Packet] -> [Char] -> (Payload, [Char])
+  go acc l = if List.size l > targetListSize
+    then match parse l with (p, rest) -> go (acc :+ p) rest
+    else (Operator typeId acc, l)
+  go [] list
+
+parse : [Char] -> (Packet, [Char])
+parse list =
+  version = fromBits (List.take 3 list)
+  typeId = fromBits (List.drop 3 (List.take 6 list))
+  match typeId with
+    4 -> match parseLiteral (List.drop 6 list) with (payload, rest) -> (Packet version payload, rest)
+    _ -> match parseOperator typeId (List.drop 6 list) with (payload, rest) -> (Packet version payload, rest)
+
+versionSum : Packet -> Nat
+versionSum = cases
+  Packet version (Operator _ packets) -> version + (sum (List.map versionSum packets))
+  Packet version _ -> version
+
+printPacket : Packet -> ()
+printPacket p =
+  go prefix =
+    cases
+      Packet version (Operator x packets) ->
+        printLine (prefix ++ "Op (" ++ (Nat.toText version) ++ ") " ++ (printOperator x))
+        List.map (go (prefix ++ "  ")) packets
+        ()
+      Packet version (Literal n) -> printLine (prefix ++ "Lit (" ++ (Nat.toText version) ++ ") "++ (Nat.toText n))
+  go "" p
+
+printOperator = cases
+  0 -> "+"
+  1 -> "*"
+  2 -> "min"
+  3 -> "max"
+  5 -> ">"
+  6 -> "<"
+  7 -> "="
+
+evaluate : Packet -> Nat
+evaluate = cases
+  Packet _ (Literal n) -> n
+  Packet _ (Operator x packets) -> match (x, List.map evaluate packets) with
+    (0, list) -> sum list
+    (1, list) -> product list
+    (2, list) -> Optional.getOrElse 0 (List.minimum list)
+    (3, list) -> Optional.getOrElse 0 (List.maximum list)
+    (5, [a, b]) -> if a > b then 1 else 0
+    (6, [a, b]) -> if a < b then 1 else 0
+    (7, [a, b]) -> if a == b then 1 else 0
+
+part1 : Packet -> Nat
+part1 = versionSum
+
+part2 : Packet -> Nat
+part2 = evaluate
+
+toNat : Natural -> Optional Nat
+toNat n =
+  match digits n with
+    Nonempty a []  -> Some a
+    Nonempty a [b] ->
+      use Nat *
+      Some (a + Nat.shiftLeft b 32)
+    _              -> None
+
+fromBits : [Char] -> Nat
+fromBits l = match Optional.flatMap toNat (Natural.parse (fromCharList l) 2) with
+  Some n -> n
+
+hexCharToBits : Char -> [Char]
+hexCharToBits = toCharList . cases
+  ?0 -> "0000"
+  ?1 -> "0001"
+  ?2 -> "0010"
+  ?3 -> "0011"
+  ?4 -> "0100"
+  ?5 -> "0101"
+  ?6 -> "0110"
+  ?7 -> "0111"
+  ?8 -> "1000"
+  ?9 -> "1001"
+  ?A -> "1010"
+  ?B -> "1011"
+  ?C -> "1100"
+  ?D -> "1101"
+  ?E -> "1110"
+  ?F -> "1111"
+  ?\n -> ""
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day16.input"
+  bits = List.flatMap hexCharToBits (toCharList inputText)
+  packet = Tuple.at1 (parse bits)
+  printPacket packet
+
+  printLine ("Part 1: " ++ Nat.toText (part1(packet)))
+  printLine ("Part 2: " ++ Nat.toText (part2(packet)))

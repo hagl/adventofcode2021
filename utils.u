@@ -9,6 +9,9 @@ utils.getFileAsText fileName =
 utils.sum : [Nat] -> Nat
 utils.sum = List.foldLeft (Nat.+) 0
 
+utils.product : [Nat] -> Nat
+utils.product = List.foldLeft (Nat.*) 1
+
 utils.dist: Nat -> Nat -> Nat
 utils.dist a b =
   d = a - b
