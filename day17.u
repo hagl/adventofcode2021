@@ -1,0 +1,34 @@
+use utils
+
+iterate : Int -> Int -> Int -> Int -> Int -> Int -> Boolean
+iterate xmin xmax ymin ymax dx dy =
+  go : (Int, Int, Int, Int) -> Boolean
+  go = cases
+    (x, _, _, _) | x > xmax -> false
+    (_, y, _, _) | y < ymin -> false
+    (x, y, _, _) | (x >= xmin) && (y <= ymax) -> true
+    (x, y, dx, dy) -> go (x + dx, y + dy, if dx > +0 then dx - +1 else +0, dy - +1)
+  go (+0, +0, dx, dy)
+
+part1 : Int -> Int-> Int-> Int -> Nat
+part1 xmin xmax ymin ymax =
+  itr = iterate xmin xmax ymin ymax
+  y = Optional.getOrElse -1 (find (y -> Optional.isSome (find (x -> itr x y) (Int.rangeClosed +0 xmax)))  (List.reverse (Int.rangeClosed ymin (negate ymin))))
+  Int.truncate0 (y * y + y / +2)
+
+part2 : Int -> Int-> Int-> Int -> Nat
+part2 xmin xmax ymin ymax =
+  itr = iterate xmin xmax ymin ymax
+  initials = List.flatMap (y -> List.filterMap (x -> if (itr x y) then Some ((x,y)) else None) (Int.rangeClosed +0 xmax)) (List.reverse (Int.rangeClosed ymin (negate ymin)))
+  List.size initials
+
+parser = ((string "target area: x=") *> parser.int) ^ (string ".." *> parser.int) ^ (string ", y=" *> parser.int) ^ (string ".." *> parser.int)
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day17.input"
+
+  match Parser.run parser (Tokens.fromText inputText) with
+    Right (((xmin, xmax), ymin), ymax) ->
+      printLine ("Part 1: " ++ Nat.toText (part1 xmin xmax ymin ymax))
+      printLine ("Part 2: " ++ Nat.toText (part2 xmin xmax ymin ymax))

@@ -1,5 +1,5 @@
 utils.getFileAsText : Text ->{IO, Exception} Text
-utils.getFileAsText fileName =   
+utils.getFileAsText fileName =
   path = FilePath.FilePath fileName
   bracket
     '(openFile (path) Read)
@@ -33,7 +33,7 @@ test> utils.elementFrequency.tests.ex2 = check (elementFrequency [0,1,1,1,1] ===
 
 utils.parser.sepBy1 : Parser e t b -> Parser e t a -> Parser e t (List.Nonempty b)
 utils.parser.sepBy1 pa ps =
-  go a = 
+  go a =
     Parser.map (as -> Nonempty a as) (some (ps *> pa))
   Parser.flatMap go pa
 
@@ -44,17 +44,23 @@ utils.parser.newLine : Parser e Char ()
 utils.parser.newLine = (eq ?\n) $> '()
 
 utils.parser.nat : Parser e Char Nat
-utils.parser.nat = 
+utils.parser.nat =
   convert s = match Nat.fromText s with
     Some n -> Parser.const n
     None -> Parser.fail (TrivialError Location.unknown (Some (Label s)) (Set.singleton (Label "natural")))
   Parser.flatMap convert (many ascii.digit $> fromCharList)
 
+utils.parser.int : Parser e Char Int
+utils.parser.int =
+  convert s = match Int.fromText s with
+    Some n -> Parser.const n
+    None -> Parser.fail (TrivialError Location.unknown (Some (Label s)) (Set.singleton (Label "int")))
+  Parser.flatMap convert (many (or (char ?-) ascii.digit) $> fromCharList)
+
 unique type utils.Grid a = Grid [[a]]
 
 {{ Parse a string consisting of lines of digits into a grid of Nat}}
 utils.digitGrid : Text -> Grid Nat
--- utils.digitGrid inputText = Grid (List.map ((List.map ((Optional.getOrElse 0) . Nat.fromText . Char.toText)) . toCharList) (List.filter (t -> Text.size t > 0) (Text.split ?\n inputText)))
 utils.digitGrid inputText =
   Text.split ?\n inputText
     |> List.filter (t -> Text.size t > 0)
@@ -62,7 +68,6 @@ utils.digitGrid inputText =
     |> Grid
 
 test> utils.digitGrid.test.ex1 = check (utils.digitGrid "012\n345" === Grid [[0, 1, 2], [3, 4, 5]])
---  Grid (List.map ((List.map ((Optional.getOrElse 0) . Nat.fromText . Char.toText)) . toCharList) ( ()))
 
 utils.gridDimensions : Grid a -> (Nat, Nat)
 utils.gridDimensions = cases
@@ -79,7 +84,3 @@ utils.maxPosition grid = match gridDimensions grid with (x,y) -> Pos (Nat.decrem
 utils.getValue : Position -> Grid a -> Optional a
 utils.getValue = cases (Pos x y) -> cases (Grid data) ->
   Optional.flatMap (l -> List.at x l) (List.at y data)
-
-
-
-
