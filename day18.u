@@ -1,0 +1,107 @@
+use utils
+use base.Nat increment
+
+unique type Tree = Node Tree Tree | Leaf Nat
+
+printTree : Tree -> Text
+printTree = cases
+  Node a b -> "[" ++ (printTree a) ++ "," ++ (printTree b) ++ "]"
+  Leaf n -> Nat.toText n
+
+splitNumber : Nat -> Tree
+splitNumber = cases
+  n | isOdd n ->
+    n2 = (decrement n) / 2
+    Node (Leaf n2) (Leaf (increment n2))
+  n ->
+    n2 = Leaf (n / 2)
+    Node n2 n2
+
+split : Tree -> (Tree, Boolean)
+split = cases
+  Leaf n | n > 9 -> (splitNumber n, true)
+  node@(Node left right) ->
+    match split left with
+      (newLeft, true) -> (Node newLeft right, true)
+      _ -> match split right with
+        (newRight, true) -> (Node left newRight, true)
+        _ -> (node, false)
+  leaf -> (leaf, false)
+
+reduce : Tree -> Tree
+reduce tree =
+  match explode tree with
+    (newTree, true) -> reduce newTree
+    _ -> match split tree with
+      (newTree, true) -> reduce newTree
+      _ -> tree
+
+explode : Tree -> (Tree, Boolean)
+explode t =
+  addToLeftmost : Nat -> Tree -> Tree
+  addToLeftmost n = cases
+    Leaf m -> Leaf (n + m)
+    Node left right -> Node (addToLeftmost n left) right
+  addToRightmost : Nat -> Tree -> Tree
+  addToRightmost n = cases
+    Leaf m -> Leaf (n + m)
+    Node left right -> Node left (addToRightmost n right)
+
+  findExplosion : Nat -> Tree -> (Tree, Optional Nat, Optional Nat, Boolean)
+  findExplosion n =
+    cases
+      (Node (Leaf a) (Leaf b)) | n >= 4 -> (Leaf 0, Some a, Some b, true)
+      node@(Leaf a) -> (node, None, None, false)
+      node@(Node left right) ->
+        match findExplosion (increment n) left with
+          (newLeft, oa, ob, true) ->
+            newRight = Optional.getOrElse right (Optional.map (b -> addToLeftmost b right) ob)
+            (Node newLeft newRight, oa, None, true)
+          (_ , None, None, false) ->
+            match findExplosion (increment n) right with
+              (newRight, oa, ob, true) ->
+                newLeft = Optional.getOrElse left (Optional.map (a -> addToRightmost a left) oa)
+                (Node newLeft newRight, None, ob, true)
+              (_ , None, None, false) -> (node , None, None, false)
+
+  match findExplosion 0 t with
+    (nt, _, _, b) -> (nt, b)
+
+add : Tree -> Tree -> Tree
+add t1 t2 =
+  reduce (Node t1 t2)
+
+addList : [Tree] -> Tree
+addList = cases
+  (h +: t) -> List.foldLeft add h t
+
+magnitude : Tree -> Nat
+magnitude = cases
+  Leaf n -> n
+  Node a b -> (3 * (magnitude a)) + (2 * (magnitude b))
+
+part1 : [Tree] -> Nat
+part1 trees =
+  t = addList trees
+  magnitude t
+
+part2 : [Tree] -> Nat
+part2 trees = Optional.getOrElse 0 (List.maximum (List.flatMap (x -> List.filterMap (y -> if x === y then None else Some (magnitude (add x y))) trees) trees))
+
+recParser : '(Parser e Char Tree) -> Parser e Char Tree
+recParser p =
+  parseTree = Parser.delay p
+  (or (nat $> Leaf) ((((char ?[) *> parseTree) ^ ((char ?,) *> parseTree <* (char ?])) $> cases (a, b) -> Node a b)))
+
+parseTree = fix recParser
+
+parser =  sepBy parseTree newLine
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day18.input"
+
+  match Parser.run parser (Tokens.fromText inputText) with
+    Right trees ->
+      printLine ("Part 1: " ++ (toText (part1 trees)))
+      printLine ("Part 2: " ++ (toText (part2 trees)))
