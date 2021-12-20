@@ -1,0 +1,50 @@
+use utils
+
+step : Nat -> [Char] -> [[Nat]] -> [[Nat]]
+step fill rule = cases
+    lines@(h +: _) ->
+      filled = List.map 'fill h
+      zipWith3
+        (l1 -> l2 -> l3 -> zipWith3 (c1 -> c2 -> c3 -> if List.at ((64 * c1) + (8 * c2) + c3) rule === (Some ?.) then 0 else 1) l1 l2 l3)
+        (map (stepLine fill) ([filled, filled] ++ lines))
+        (map (stepLine fill) ([filled] ++ lines ++ [filled]))
+        (map (stepLine fill) (lines ++ [filled, filled]))
+
+stepLine : Nat -> [Nat] -> [Nat]
+stepLine fill list =
+  zipWith3
+    (c1 -> c2 -> c3 -> (4 * c1) + (2 * c2) + c3)
+    ([fill, fill] ++ list)
+    ([fill] ++ list ++ [fill])
+    (list ++ [fill, fill])
+
+print: [[Nat]] -> ()
+print grid =
+  List.map (list -> printLine (Text.fromCharList (List.map (n -> if n == 1 then ?# else ?.) list))) grid
+  printLine ""
+
+part1 : Text -> [Text] -> Nat
+part1 = solve 1
+
+part2 : Text -> [Text] -> Nat
+part2 = solve 25
+
+solve : Nat -> Text -> [Text] -> Nat
+solve count ruleText image =
+  rule = Text.toCharList ruleText
+  grid = List.map (t -> List.map (c -> if c == ?. then 0 else 1) (Text.toCharList t)) image
+  result = List.foldRight (_ -> acc -> step 1 rule (step 0 rule acc)) grid (List.range 0 count)
+  -- print result
+  List.size (List.filter ((==) 1) (List.flatMap id result))
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day20.input"
+  lines = (Text.split ?\n inputText)
+
+  match lines with
+    (rules +: rest) ->
+      image = List.filter (t -> Text.size t > 0) rest
+      printLine ("Part 1: " ++ (toText (part1 rules image)))
+      printLine ("Part 2: " ++ (toText (part2 rules image)))
+
