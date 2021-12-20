@@ -84,3 +84,11 @@ utils.maxPosition grid = match gridDimensions grid with (x,y) -> Pos (Nat.decrem
 utils.getValue : Position -> Grid a -> Optional a
 utils.getValue = cases (Pos x y) -> cases (Grid data) ->
   Optional.flatMap (l -> List.at x l) (List.at y data)
+
+utils.zipWith3 : (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
+utils.zipWith3 f a b c =
+  go acc as bs cs =
+    match (as, bs, cs) with
+      (ah +: at, bh +: bt, ch +: ct) -> go (acc :+ f ah bh ch) at bt ct
+      _                    -> acc
+  go [] a b c
