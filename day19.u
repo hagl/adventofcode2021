@@ -1,0 +1,161 @@
+use utils
+use base.Nat increment
+
+unique type Vector = V [Int]
+unique type Matrix = M [[Int]]
+
+add : Vector -> Vector -> Vector
+add = cases (V as) -> cases (V bs) -> V (List.zipWith (+) as bs)
+
+subtract : Vector -> Vector -> Vector
+subtract = cases (V as) -> cases (V bs) -> V (List.zipWith (-) as bs)
+
+test> add.tests.ex1 = check(add (V [+1,+2,+3]) (V [+1,+2,+3]) === V [+2,+4,+6])
+
+mult : Matrix -> Vector -> Vector
+mult = cases M ax -> cases V bs -> V (List.map (row -> List.foldLeft (+) +0 (List.zipWith (*) row bs)) ax)
+
+test> mult.tests.ex1 = check(mult (M [[+1, +0, +0], [+0, +1, +0], [+0, +0, +1]]) (V [+1,+2,+3]) === (V [+1,+2,+3]))
+test> mult.tests.ex2 = check(mult (M [[+0, +0, +1], [+0, +1, +0], [+1, +0, +0]]) (V [+1,+2,+3]) === (V [+3,+2,+1]))
+test> mult.tests.ex3 = check(mult (M [[+2, +2, +2], [+1, +1, +1], [-1, -1, -1]]) (V [+1,+2,+3]) === (V [+12,+6,-6]))
+
+determinant : Matrix -> Int
+determinant = cases M [[a11, a21, a31], [a12, a22, a32], [a13, a23, a33]] ->
+  (a11 * ((a22 * a33) - (a23 * a32))) - (a21 * ((a12 * a33) - (a32 * a13))) + (a31 * ((a12 * a23) - (a22 * a13)))
+--
+permutations : [a] -> [[a]]
+permutations = cases
+  [] -> [[]]
+  l -> List.flatMap (el -> List.map (p -> (el List.+: p)) (permutations (List.filter (not . ((===) el)) l))) l
+
+rotationMatrices = List.filterMap (as -> if determinant (M as) == +1 then Some (M as) else None) (List.flatMap permutations (List.flatMap (x -> List.flatMap (y -> List.map (z -> [x,y,z]) [[+0, +0, +1], [+0, +0, -1]]) [[+0, +1, +0], [+0,  -1, +0]]) [[+1, +0, +0], [-1, +0, +0]]))
+> List.size rotationMatrices
+
+abs: Int -> Int -> Nat
+abs a b = truncate0 (if a > b then a - b else b - a)
+
+vdist: Vector -> Vector -> Nat
+vdist = cases V [x1, y1, z1] -> cases V [x2, y2, z2] ->
+  List.foldLeft (acc -> e -> 2048 * acc + e) 0 (List.sortBy id [abs x1 x2, abs y1 y2, abs z1 z2])
+
+manhatten : Vector -> Vector -> Nat
+manhatten = cases V [x1, y1, z1] -> cases V [x2, y2, z2] ->
+  sum [abs x1 x2, abs y1 y2, abs z1 z2]
+
+createDistList : [Vector] -> [(Nat, (Nat, Nat))]
+createDistList list =
+  il = List.indexed list
+  List.sortBy id (List.filterMap (cases ((v1, i1), (v2, i2)) -> if i1 Nat.< i2 then None else Some (vdist v1 v2, (i1, i2))) (tuples il il))
+
+createDistMap : [Vector] -> Map Nat [(Nat, Nat)]
+createDistMap list =
+  il = List.indexed list
+  Map.fromListWith (List.++) (List.filterMap (cases ((v1, i1), (v2, i2)) -> if i1 Nat.< i2 then None else Some (vdist v1 v2, [(i1, i2)])) (tuples il il))
+
+tuples : [a] -> [b] -> [(a,b)]
+tuples l1 l2 = List.flatMap (x -> List.map (y -> (x,y)) l2) l1
+
+oneEqual : Nat -> Nat -> Nat -> Nat -> Optional (Nat, Nat, Nat)
+oneEqual a b c d =
+  if Set.size (Set.fromList [a, b, c, d]) != 3
+    then None
+    else if a == c then Some (a, b, d)
+    else if a == d then Some (a, b, c)
+    else if b == c then Some (b, a, d)
+    else Some (b, a, c)
+
+unique type Scanner = Scanner Nat [Vector] Vector (Map Nat [(Nat, Nat)]) ([(Nat, (Nat, Nat))])
+
+findOverlap : Scanner -> Scanner -> Optional Scanner
+findOverlap = cases Scanner _ vectors1 _ _ distList1 -> cases Scanner n2 vectors2 center2 dists2 distList2 ->
+  List.findMap (cases (d, (a1, a2)) ->
+    List.findMap (cases (b1, b2) ->
+          List.findMap (cases (d3, (a3, a4)) ->
+            match oneEqual a1 a2 a3 a4 with
+              None -> None
+              Some (x0, x1, x2) ->
+                List.findMap (cases (b3, b4) ->
+                    match oneEqual b1 b2 b3 b4 with
+                      None -> None
+                      Some (y0, y1, y2) ->
+                        v1 = pointDiff vectors1 x0 x1
+                        v2 = pointDiff vectors1 x0 x2
+                        w1 = pointDiff vectors2 y0 y1
+                        w2 = pointDiff vectors2 y0 y2
+                        List.findMap (rm ->
+                          if (mult rm w1 === v1) && (mult rm w2 ===v2)
+                            then
+                              vx1 = point vectors1 x0
+                              vy2 = point vectors2 y0
+                              newVectors2 = transform  vectors2 vx1 rm vy2
+                              matchCount = List.size (List.filter (v -> List.contains v vectors1) newVectors2)
+                              -- Debug.watch ("***" ++ (Nat.toText matchCount))
+                              if (matchCount >= 12) then Some (Scanner n2 newVectors2 (add vx1 (mult rm (subtract center2 vy2))) dists2 distList2) else None
+                            else
+                              None
+                        ) rotationMatrices
+                  ) (Map.getOrElse [] d3 dists2)
+            ) distList1
+    ) (Map.getOrElse [] d dists2)
+  ) distList1
+
+transform : [Vector] -> Vector -> Matrix -> Vector -> [Vector]
+transform vectors x0 rm y0 =
+    List.map (v -> (add x0 (mult rm (subtract v y0)))) vectors
+
+point : [Vector] -> Nat -> Vector
+point vectors ix0 = match List.at ix0 vectors with Some p -> p
+
+pointDiff : [Vector] -> Nat -> Nat -> Vector
+pointDiff vectors ix0 ix1 = match (List.at ix0 vectors, List.at ix1 vectors) with (Some p, Some q) -> subtract q p
+
+process : [(Nat, [Vector])] -> [Scanner]
+process input =
+  scanners = List.map (cases (n, list) -> Scanner n list (V [+0, +0, +0]) (createDistMap list) (createDistList list)) input
+  go : [Scanner] -> Scanner -> [Scanner] -> [Scanner] -> [Scanner] -> [Scanner]
+  go checked current matched unmatched rest = match (matched, unmatched, rest) with
+    (_, [], []) -> current +: checked ++ matched
+    ([], _, []) -> Debug.watch "no more scanners to match with" []
+    ((h +: t), _, []) -> go (current +: checked)  h t [] unmatched
+    (_, _, (h +: t)) ->
+        printLine ("Testing " ++ (match current with Scanner n _ _ _ _ -> Nat.toText n) ++ " with " ++ (match h with Scanner n _ _ _ _ -> Nat.toText n))
+        match findOverlap current h with
+          None -> go checked current matched (h +: unmatched) t
+          Some scanner -> go checked current (scanner +: matched) unmatched t
+  match scanners with
+    (h +: t) -> go [] h [] [] t
+
+part1 : [Scanner] -> Nat
+part1 scanners =
+  Set.size (Set.fromList (List.flatMap (cases Scanner _ list _ _ _ -> list) scanners))
+
+part2 : [Scanner] -> Nat
+part2 scanners =
+  centers = List.map (cases Scanner _ _ center _ _ -> center) scanners
+  Optional.getOrElse 0 (maximum (List.map (cases (x,y) -> manhatten x y) (tuples centers centers)))
+
+header : Parser e Char Nat
+header = (string "--- scanner ") *> parser.nat <* ((string " ---") *> newLine)
+
+points : Parser e Char Vector
+points = parser.int ^ ((char ?,) *> parser.int) ^ ((char ?,) *> parser.int) $> cases ((x, y), z) -> V [x, y, z]
+
+scanner : Parser e Char (Nat, [Vector])
+scanner = header ^ (sepBy points newLine)
+
+parser = sepBy scanner (newLine *> newLine)
+
+> Int.maxInt
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day19.input"
+
+  match Parser.run parser (Tokens.fromText inputText) with
+    Right input ->
+      startTime = !systemTimeMicroseconds
+      scanners = process input
+      printLine ("Part 1: " ++ (toText (part1 scanners)))
+      printLine ("Part 2: " ++ (toText (part2 scanners)))
+      duration = !systemTimeMicroseconds - startTime
+      printLine ("Duration:" ++ (Int.toText duration) ++ "μs")
