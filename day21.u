@@ -1,0 +1,60 @@
+use utils
+
+part1 : Nat -> Nat-> Nat
+part1 startPos1 startPos2 =
+  -- n move (starting form 1)
+  -- d last dice position
+  -- positions 0 -9 to be able to use module
+  go n p1 s1 p2 s2 d0 =
+    d1 = if d0 == 100 then 1 else increment d0
+    d2 = if d1 == 100 then 1 else increment d1
+    d3 = if d2 == 100 then 1 else increment d2
+    p1New = Nat.mod (p1 + d0 + d1 + d2 ) 10
+    s1New = s1 + p1New + 1
+    if (s1New >= 1000) then n * 3 * s2 else go (increment n) p2 s2 p1New s1New d3
+  go 1 (decrement startPos1) 0 (decrement startPos2) 0  1
+
+-- Possible outcomes with count of casting 3 dices:
+probs = [0, 0, 0, 1, 3, 6, 7, 6, 3, 1]
+
+-- States score (0-20), pos (0 - 9)
+calculate : [Nat] -> Nat -> Nat
+calculate state n =
+  score = n / 10
+  pos = Nat.mod n 10
+  previousScore = score - (pos + 1)
+  count = if (previousScore < +0)
+    then 0
+    else
+      sum (List.map (cast -> (Optional.getOrElse 0 (List.at cast probs)) * (Optional.getOrElse 0 (List.at ((Int.truncate0 previousScore) * 10 + (Int.truncate0 (Int.mod (pos - cast) +10))) state))) (List.range 3 10))
+  count
+
+part2 : Nat -> Nat-> Nat
+part2 startPos1 startPos2 =
+  go state1 state2 wins1 wins2 r2 =
+      if r2 == 0
+      then wins2
+      else
+        state= List.map (calculate state1) (List.range 0 310)
+        newState1 = List.take 210 state
+        wins = sum (List.drop 210 state)
+        running = sum (newState1)
+        newWins1 =  wins1 + (r2 * wins)
+        go state2 newState1 wins2 newWins1 running
+  go (List.updateAt '1 (decrement startPos1) (List.map '0 (List.range 0 210))) (List.updateAt '1 (decrement startPos2) (List.map '0 (List.range 0 210))) 0 0 1
+
+player = ((string "Player ") *> parser.nat) ^ ((string " starting position: ") *> parser.nat)<* newLine
+
+parser : Parser e Char ((Nat, Nat), (Nat, Nat))
+parser = player ^ player
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day21.input"
+  match Parser.run parser (Tokens.fromText inputText) with
+    Right ((n1, s1), (n2, s2)) ->
+      printLine ("Part 1: " ++ Nat.toText (part1 s1 s2))
+      printLine ("Part 2: " ++ Nat.toText (part2 s1 s2))
+
+
+
