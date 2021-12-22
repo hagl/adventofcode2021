@@ -1,0 +1,116 @@
+use utils
+
+unique type CubeEx = CubeEx (Int, Int)  (Int, Int)  (Int, Int)
+
+unique type Cube = Cube Boolean (Int, Int)  (Int, Int)  (Int, Int)
+
+contains : CubeEx -> (Int, Int, Int) -> Boolean
+contains =  cases CubeEx (x1, x2) (y1, y2) (z1, z2) -> cases (x, y, z) ->  (x >= x1) && (x < x2) && (y >= y1) && (y < y2) && (z >= z1) && (z < z2)
+
+containsCube : CubeEx -> CubeEx  -> Boolean
+containsCube =  cases CubeEx (x1, x2) (y1, y2) (z1, z2) -> cases CubeEx (x3, x4) (y3, y4) (z3, z4) ->
+  (x3 >= x1) && (x4 <= x2) && (y3 >= y1) && (y4 <=y2) && (z3 >= z1) && (z4 <= z2)
+
+notEmpty : CubeEx -> Boolean
+notEmpty =  cases CubeEx (x1, x2) (y1, y2) (z1, z2) -> (x1 < x2) && (y1 < y2) && (z1 < z2)
+
+disjoint : CubeEx -> CubeEx -> Boolean
+disjoint = cases c1@(CubeEx (x1, x2) (y1, y2) (z1, z2)) -> cases c2@(CubeEx (x3, x4) (y3, y4) (z3, z4)) ->
+  (x3 >= x2) || (x1 >= x4) || (y3 >= y2) || (y1 >= y4) || (z3 >= z2) || (z1 >= z4)
+
+subtract : CubeEx -> CubeEx -> [CubeEx]
+subtract = cases c1@(CubeEx (x1, x2) (y1, y2) (z1, z2)) -> cases c2@(CubeEx (x3, x4) (y3, y4) (z3, z4)) ->
+  if disjoint c1 c2
+  then [c1]
+  else
+    if containsCube c2 c1
+    then []
+    else
+      cubes =
+        List.flatMap (cases xs@(xl, _) ->
+          List.flatMap (cases ys@(yl, _) ->
+            List.flatMap (cases zs@(zl, _) ->
+              if (contains c1 (xl, yl, zl)) && (not (contains c2 (xl, yl, zl))) then [CubeEx xs ys zs] else []
+            ) (List.slidingPairs (sort [z1, z2, z3, z4]))
+          ) (List.slidingPairs (sort [y1, y2, y3, y4]))
+        ) (List.slidingPairs (sort [x1, x2, x3, x4]))
+      List.filter notEmpty cubes
+
+combine : [CubeEx] -> Cube -> [CubeEx]
+combine cubeExs = cases Cube b (x1, x2) (y1, y2) (z1, z2) ->
+  cubeEx = CubeEx (x1, x2 + +1) (y1, y2 + +1) (z1, z2 + +1)
+  printLine ("Volume: " ++ (Nat.toText (sum (map (Int.truncate0 . volume) cubeExs))))
+  result =
+    if b
+      then
+      -- go [to add/ checked against current cube to be subtracted] [to add] [subtracted] [to subtract]
+        go q nl p el = match (nl, el) with
+          (n +: ns, e +: es) ->
+            -- if containsCube n e
+            --   then go q nl p es
+            --   else
+              if containsCube e n
+                then go q ns p el
+                else go ((subtract n e) ++ q) ns p el
+          (_, []) -> nl ++ p ++ q
+          ([], e +: es) -> go [] q (e List.+: p) es
+        go [] [cubeEx] [] cubeExs
+      else
+        List.flatMap (c ->subtract c cubeEx) cubeExs
+  printLine ("**" ++ (Nat.toText (List.size result)))
+  result
+
+volume : CubeEx -> Int
+volume = cases CubeEx (x1, x2) (y1, y2) (z1, z2) -> (x2 - x1) * (y2 - y1) * (z2 - z1)
+
+part2 : [Cube] -> Nat
+part2 cubes =
+  p2Cubes = cubes
+  result = List.foldLeft combine [] p2Cubes
+  sum (map (Int.truncate0 . volume) result)
+
+apply : Int -> Int -> Int -> Boolean -> Cube -> Boolean
+apply x y z s = cases
+  Cube f (xmin, xmax) (ymin, ymax) (zmin, zmax) ->
+    result = if (x >= xmin) && (x <= xmax) && (y >= ymin) && (y <= ymax) && (z >= zmin) && (z <= zmax) then f else s
+    result
+
+p1relevant : Cube -> Boolean
+p1relevant = cases Cube f (xmin, xmax) (ymin, ymax) (zmin, zmax) ->
+  if (xmin > +50) || (ymin > +50) || (zmin > +50) || (xmax < -50) || (ymax < -50) || (zmax < -50) then false else true
+
+part1 : [Cube] -> Nat
+part1 cubes =
+  p1Cubes = List.filter p1relevant cubes
+  List.size (
+    List.flatMap (x ->
+      (Debug.watch (Int.toText x) (List.flatMap (y ->
+        (List.filter (z -> List.foldLeft (apply x y z) false p1Cubes) (Int.rangeClosed -50 +50))
+      ) (Int.rangeClosed -50 +50)))
+    ) (Int.rangeClosed -50 +50))
+
+
+range : Parser e Char (Int, Int)
+range = parser.int ^ (string ".." *> parser.int)
+
+onOff : Parser e Char Boolean
+onOff = (or (string "on" $> 'true) (string "off" $> 'false))
+
+cubeParser : Parser e Char Cube
+cubeParser = onOff ^ (string " x=" *> range) ^ (string ",y=" *> range) ^ (string ",z=" *> range) $> cases (((b, xr), yr), zr) -> Cube b xr yr zr
+
+parser = sepBy cubeParser newLine
+
+main : '{IO, Exception} ()
+main _ =
+  inputText = utils.getFileAsText "day22.input"
+
+  match Parser.run parser (Tokens.fromText inputText) with
+    Right input ->
+      startTime = !systemTimeMicroseconds
+      printLine ("Part 1: " ++ (toText (part1 input)))
+      printLine ("Part 2: " ++ (toText (part2 input)))
+      duration = !systemTimeMicroseconds - startTime
+      printLine ("Duration:" ++ (Int.toText duration) ++ "μs")
+
+
